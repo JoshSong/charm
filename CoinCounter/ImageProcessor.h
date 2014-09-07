@@ -24,6 +24,11 @@ public:
 	void calibrate();
 	LONGLONG run(int mode, int numFrames, std::vector<Object> &coins, float &tableSpeed);
 
+private:
+	double findMean(std::vector<double> list);
+	double findStdDev(std::vector<double> list);
+	double findMeanNoOutliers(std::vector<double> list);
+
 };
 
 
