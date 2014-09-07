@@ -84,7 +84,7 @@ void FitEllipses(vector<vector<cv::Point> > &pointsToFit, int minReqPoints, Elli
 ELLIPSE_TYPE ValidateEllipse(cv::RotatedRect e, EllipseValidationParameters evp, float *err);
 
 const double d2r = PI / 180.0;
-int debug_mode = DEBUG_NONE;
+int debug_mode = DEBUG_TOFILE;
 cv::Scalar colors[256];
 float point_weights[21];
 const cv::Point checkpoints[21] = { 
@@ -101,12 +101,13 @@ const cv::Point checkpoints[21] = {
 void DebugOutput(const char *title, cv::Mat img, bool include_step = true, bool reset_step = false)
 {
 	static int step = 0;
+	static int frame = 0;
 	if (debug_mode)
 	{
 		if (reset_step) step = 0;
 		char buf[512];
 		if (include_step)
-			sprintf(buf, "Step %d - %s.png", ++step, title);
+			sprintf(buf, "%ds.%d - %s.png", ++frame, ++step, title);
 		else
 			sprintf(buf, "%s.png", title);
 		if (debug_mode == DEBUG_TOSCREEN)
@@ -1508,7 +1509,7 @@ void ImageProcessor::calibrate()
 
 	cv::Size boardSize(4,11);
 	cv::Size image_size;
-	float squareSize = 17.8f;
+	float squareSize = 15.8f;
 
 	vector<cv::Mat> rvecs, tvecs;
 
