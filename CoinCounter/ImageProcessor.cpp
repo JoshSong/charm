@@ -262,7 +262,7 @@ LONGLONG ImageProcessor::run(int mode, int numFrames, std::vector<Object> &outpu
 	int frame_count = 0;
 	LONGLONG lastCamTime = -1;
 	float lastTableAngle;
-	float avgTableSpeed = 0;
+	std::vector<double> tableSpeeds;
 	float table_rotation = 0;
 	while (frame_count < numFrames)
 	{
@@ -374,7 +374,7 @@ LONGLONG ImageProcessor::run(int mode, int numFrames, std::vector<Object> &outpu
 				float angle_diff = table_rotation - lastTableAngle;
 				if (angle_diff < -0.1f) angle_diff += 2*PI; // TODO: hmmmmm...............
 				table_speed = angle_diff/dt;
-				avgTableSpeed = (avgTableSpeed*(frame_count-2) + table_speed) / (float)(frame_count-1);
+				tableSpeeds.push_back(table_speed);
 				//printf("frame %d, dt %f, angle diff %f table rot %f \n", frame_count, dt, angle_diff, table_rotation);
 			}
 			//printf("frame %d, speed: %f, avg: %f\n", frame_count, table_speed, avgTableSpeed);
@@ -426,7 +426,7 @@ LONGLONG ImageProcessor::run(int mode, int numFrames, std::vector<Object> &outpu
 			sprintf(buf, "Processing time: %f", total_time);
 			cv::putText(window, buf, cv::Point(680, 460), cv::FONT_HERSHEY_TRIPLEX, 0.4f, cv::Scalar(0,0,0));
 
-			sprintf(buf, "Table Speed: %.4f (avg: %.4f)", table_speed, avgTableSpeed);
+			sprintf(buf, "Table Speed: %.4f", table_speed);
 			cv::putText(window, buf, cv::Point(680, 430), cv::FONT_HERSHEY_TRIPLEX, 0.4f, cv::Scalar(0,0,0));
 
 			DebugOutput("FINAL RESULT", window);
@@ -471,8 +471,10 @@ LONGLONG ImageProcessor::run(int mode, int numFrames, std::vector<Object> &outpu
 			output_coins.push_back(out);
 		}
 	}
-
-	tableSpeed = avgTableSpeed;
+	double stdDev = findStdDev(tableSpeeds);
+	tableSpeed = findMeanNoOutliers(tableSpeeds);
+	std::cout << "Standard Deviation: " << findStdDev(tableSpeeds) << std::endl;
+	std::cout << "Average table speed: " << tableSpeed << std::endl;
 	return lastCamTime;
 }
 
@@ -1481,15 +1483,6 @@ void GroupSegmentsIntoCurves(vector<vector<cv::Point> > &seglist, vector<vector<
 
 
 
-
-
-
-
-
-
-
-
-
 void ImageProcessor::calibrate()
 {
 	// try to open webcam
@@ -1589,4 +1582,48 @@ void ImageProcessor::calibrate()
 		if (cv::waitKey(10) == 27) return;
 	}
 
+}
+
+double ImageProcessor::findMean(std::vector<double> list) 
+{
+	double sum = 0.0;
+	for (std::size_t i = 0; i < list.size(); i++)
+	{
+		sum += list[i];
+	}
+	return sum/(list.size());
+}
+
+double ImageProcessor::findStdDev(std::vector<double> list)
+{
+	double mean = findMean(list);
+	double n = (double) list.size();
+	double foo = 0.0;
+	for (std::size_t i = 0; i < list.size(); i++)
+	{
+		double bar = abs(list[i] - mean);
+		foo += bar * bar;
+	}
+	return sqrt((1/n) * foo);
+}
+
+double ImageProcessor::findMeanNoOutliers(std::vector<double> list)
+{
+
+	// Find standard deviation
+	double mean = findMean(list);
+	double stdDev = findStdDev(list);
+
+	// Get new list with outliers removed
+	std::vector<double> newList;
+	for (std::size_t i = 0; i < list.size(); i++)
+	{
+		if (std::abs(list[i] - mean) < 2 * stdDev) 
+		{
+			newList.push_back(list[i]);
+		}
+	}
+
+	// Return mean of new list
+	return findMean(newList);
 }
