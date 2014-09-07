@@ -1,0 +1,28 @@
+LIBRARY	"dynamixel"
+
+EXPORTS
+	gbInstructionPacket				@1
+	gbStatusPacket					@2
+    dxl_initialize					@3
+    dxl_terminate					@4
+    dxl_get_baud					@5
+    dxl_set_baud					@6
+    dxl_get_result					@7
+    dxl_tx_packet					@8
+    dxl_rx_packet					@9
+    dxl_txrx_packet					@10
+    dxl_set_txpacket_id				@11
+    dxl_set_txpacket_instruction	@12
+    dxl_set_txpacket_parameter		@13
+    dxl_set_txpacket_length			@14
+    dxl_get_rxpacket_error			@15
+    dxl_get_rxpacket_length			@16
+    dxl_get_rxpacket_parameter		@17
+    dxl_makeword					@18
+    dxl_get_lowbyte					@19
+    dxl_get_highbyte				@20
+    dxl_ping						@21
+    dxl_read_byte					@22
+    dxl_write_byte					@23
+    dxl_read_word					@24
+    dxl_write_word					@25
