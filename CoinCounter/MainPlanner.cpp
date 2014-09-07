@@ -1,5 +1,6 @@
 
 #include "stdafx.h"
+#include <iostream>
 #include "MainPlanner.h"
 using namespace std;
 
@@ -22,8 +23,8 @@ void MainPlanner::go() {
 	trajToCoins = vector<vector<PointNode>>();
 
 	// Add to time offset depending on how many items were detected
-	PLAN_TIME_OFFSET = 800;
-	LONGLONG plan_time_per_path = 32 * items.size();
+	PLAN_TIME_OFFSET = 50;
+	LONGLONG plan_time_per_path = 3 * items.size();
 	for (int i = items.size(); i > 0; i--) {
 		PLAN_TIME_OFFSET += plan_time_per_path * i;
 	}
@@ -37,17 +38,20 @@ void MainPlanner::go() {
 	PointNode start_node(pos, millisecondsNow() + PLAN_TIME_OFFSET);
 
 	LONGLONG plan_start_time = millisecondsNow();
+	LONGLONG plan_end_time = plan_start_time + PLAN_TIME_OFFSET;
 
 	// Call calcTrajectories, which finds paths (see header for description)
 	// Keep planning trajectories until all paths for getting coins to bins are found
 	// (i.e. calcTrajectories returns false, or time limit for planning is exceeded
 	// or we have found paths for 5 coins
-	while (calcTrajectories(start_node) == true && millisecondsNow() - plan_start_time < PLAN_TIME_OFFSET - 400 ) { //&& trajToBins.size() < 5) {
+	while (calcTrajectories(start_node) && millisecondsNow() < (plan_end_time - 20) ) { //&& trajToBins.size() < 5) {
 		int traj_index = trajToBins.size() - 1;
 		int node_index = trajToBins[traj_index].size() - 1;
 		PointNode prev_node = trajToBins[traj_index][node_index];
 		start_node = PointNode(prev_node.point, prev_node.time + DROP_TIME);
 	}
+
+	std::cout << "Proccessing took " << millisecondsNow() - plan_start_time << "ms (" << PLAN_TIME_OFFSET << " allowed)." << std::endl;
 
 	// Follow the trajectories
 	int index = 0;
@@ -76,7 +80,7 @@ void MainPlanner::go() {
 
 }
 
-void MainPlanner::findCoins() {
+bool MainPlanner::findCoins() {
 
 	//describe the bins
 	Point bin5c(-120, -25);
@@ -94,7 +98,10 @@ void MainPlanner::findCoins() {
 	std::vector<Object> coins;
 
 	float tableSpeed = 0;
-	LONGLONG t0 = imgProc.run(mode, 20, coins, tableSpeed);
+	LONGLONG t0 = imgProc.run(mode, 40, coins, tableSpeed);
+	if (t0 < 0) {
+		return false;
+	}
 	ROT_SPEED = tableSpeed * ROT_SPEED_FACTOR;
 	Point goal;
 	for (int i = 0; i<coins.size(); i++){
@@ -138,6 +145,7 @@ void MainPlanner::findCoins() {
 			items.push_back(input_coin);
 		}
 	}
+	return true;
 }
 
 bool MainPlanner::calcTrajectories(PointNode start_node) {

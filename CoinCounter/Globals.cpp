@@ -6,15 +6,15 @@
 Point ORIGIN(0,0);
 
 // In mm
-float TABLE_RADIUS = 100;
+float TABLE_RADIUS = 95;
 float BIN_RADIUS = 30;
-float MARGIN = 5;		// Added to coin radius for collision detection in AStar
+float MARGIN = 8;		// Added to coin radius for collision detection in AStar
 
 // In radians / s
 float ROT_SPEED = 0;	// Radians / second, rotation speed of turntable
 float ROT_SPEED_FACTOR = 1.0;	// Adjustment factor
 
-LONGLONG TIME_STEP = 25;	// Milliseconds, for path planning. Decrease to be faster.
+LONGLONG TIME_STEP = 10;	// Milliseconds, for path planning. Decrease to be faster.
 float DIST_STEP = 3.f;	// Approximate distance arm can move in one time step in mm. Path planning resolution.
 
 // Motion planning stuff
