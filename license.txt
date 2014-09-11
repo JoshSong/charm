@@ -1,0 +1,5 @@
+License
+
+This code is licensed under EITHER (your option):
+    1. GNU GPL V2.
+    2. Commercial license (please contact us at Joshua_Song@outlook.com for details).
