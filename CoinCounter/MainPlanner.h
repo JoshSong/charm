@@ -26,7 +26,7 @@ public:
 	MainPlanner();
 
 	// Find coins using image processing
-	void findCoins();
+	bool findCoins();
 
 	// Start the control loop
 	// Ends once all coins are put in the bin (ideally)

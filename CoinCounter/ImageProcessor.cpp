@@ -84,7 +84,7 @@ void FitEllipses(vector<vector<cv::Point> > &pointsToFit, int minReqPoints, Elli
 ELLIPSE_TYPE ValidateEllipse(cv::RotatedRect e, EllipseValidationParameters evp, float *err);
 
 const double d2r = PI / 180.0;
-int debug_mode = DEBUG_TOFILE;
+int debug_mode = DEBUG_NONE;
 cv::Scalar colors[256];
 float point_weights[21];
 const cv::Point checkpoints[21] = { 
@@ -110,6 +110,7 @@ void DebugOutput(const char *title, cv::Mat img, bool include_step = true, bool 
 			sprintf(buf, "%ds.%d - %s.png", ++frame, ++step, title);
 		else
 			sprintf(buf, "%s.png", title);
+			
 		if (debug_mode == DEBUG_TOSCREEN)
 			cv::imshow(buf, img);
 		else if (debug_mode == DEBUG_TOFILE)
@@ -131,35 +132,35 @@ bool setupHistogram(HistogramInfo &histInfo, const char *histoFile, int mode)
 	histInfo.ranges[0] = histInfo.hranges;
 	histInfo.ranges[1] = histInfo.sranges;
 
-	// read in comparison histograms from file
-	histInfo.hist_storage.open(histoFile, cv::FileStorage::READ);
-
-	if (histInfo.hist_storage.isOpened())
-	{
-		histInfo.hist_storage["silver"] >> histInfo.silver_hist;
-		histInfo.hist_storage["gold"] >> histInfo.gold_hist;
-
-		if (histInfo.silver_hist.rows != histInfo.histSize[0] || histInfo.silver_hist.cols != histInfo.histSize[1] || histInfo.gold_hist.rows != histInfo.histSize[0] || histInfo.gold_hist.cols != histInfo.histSize[1])
-		{
-			printf("Histogram from file has unexpected size!");
-			return false;
-		}
-	}
-	else if (mode != ImageProcessor::MODE_TRAINCLASSIFY)
-	{
-		// if we can't open the file, and we're not going to train now, then we cannot compare colour to anything... so error and quite
-		printf("Histogram file not found/accessible!");
-		return false;
-	}
-
 	if (mode != ImageProcessor::MODE_TRAINCLASSIFY)
 	{
+
+		// read in comparison histograms from file
+		histInfo.hist_storage.open(histoFile, cv::FileStorage::READ);
+
+		if (histInfo.hist_storage.isOpened())
+		{
+			histInfo.hist_storage["silver"] >> histInfo.silver_hist;
+			histInfo.hist_storage["gold"] >> histInfo.gold_hist;
+
+			if (histInfo.silver_hist.rows != histInfo.histSize[0] || histInfo.silver_hist.cols != histInfo.histSize[1] || histInfo.gold_hist.rows != histInfo.histSize[0] || histInfo.gold_hist.cols != histInfo.histSize[1])
+			{
+				printf("Histogram from file has unexpected size!");
+				return false;
+			}
+		}
+		else
+		{
+			// if we can't open the file, and we're not going to train now, then we cannot compare colour to anything... so error and quite
+			printf("Histogram file not found/accessible!");
+			return false;
+		}
 		// if we are not train (i.e. appending to histograms) then we should normalize them for comparision
 		cv::normalize(histInfo.gold_hist, histInfo.gold_hist, 1.0, cv::NORM_L1);
 		cv::normalize(histInfo.silver_hist, histInfo.silver_hist, 1.0, cv::NORM_L1);
-	}
 
-	histInfo.hist_storage.release();
+		histInfo.hist_storage.release();
+	}
 	
 	return true;
 }
@@ -195,30 +196,23 @@ void *webcamCapture(void *cam)
 		imageTimestamp = millisecondsNow(); 
 		webcam->read(camImage); 
 		pthread_mutex_unlock(&camMutex);
-
+		
 		cv::imshow("vid", camImage); 
-		cv::waitKey(15); }
+		cv::waitKey(15); 
+	}
 
 	return NULL;
 }
 
 LONGLONG ImageProcessor::run(int mode, int numFrames, std::vector<Object> &output_coins, float &tableSpeed)
 {
-	// set mode based on cmd line arg
-	/*int mode = MODE_NORMAL;
-	if (argc > 1)
-	{
-		if (strcmp(argv[1], "calib") == 0) mode = MODE_CALIBRATE;
-		else if (strcmp(argv[1], "train") == 0) mode = MODE_TRAINCLASSIFY;
-		else if (strcmp(argv[1], "debug") == 0) debug_mode = DEBUG_TOSCREEN;
-	}*/
-
 	///////////////////////////////////////////////////////////////////////////////////////
 	// TODO: fix/move this!!!
-	cv::RNG rng(12345);
-	for (int i = 0; i < 256; i++)
-		colors[i] = cv::Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
-
+	if (debug_mode) {
+		cv::RNG rng(12345);
+		for (int i = 0; i < 256; i++)
+			colors[i] = cv::Scalar(rng.uniform(0,255), rng.uniform(0,255), rng.uniform(0,255));
+	}
 	for (int i = 0; i < 21; i++)
 		point_weights[i] = (float)(checkpoints[i].x * checkpoints[i].x + checkpoints[i].y * checkpoints[i].y);
 	/////////////////////////////////////////////////////////////////////////////////////////
@@ -248,7 +242,7 @@ LONGLONG ImageProcessor::run(int mode, int numFrames, std::vector<Object> &outpu
 	}
 
 	HistogramInfo histInfo;
-	if (!setupHistogram(histInfo, "histograms.yml", mode)) { cv::waitKey(); return EXIT_FAILURE; }
+	if (!setupHistogram(histInfo, "histograms.yml", mode)) { cv::waitKey(); return -1; }
 	webcam.read(camImage);
 	
 	pthread_mutex_init(&camMutex, NULL);
@@ -502,7 +496,7 @@ bool GetCoinClassifyErrors(cv::Mat &img, vector<Coin> &coins, HistogramInfo &his
 			img.copyTo(plate_preview);
 			cv::ellipse(plate_preview, coins[i].ellipse, cv::Scalar(255,255,255));
 			cv::imshow("plate", plate_preview);
-			cv::imshow("coin", coin_preview);
+			cv::imshow("coin (left=silver, right=gold)", coin_preview);
 
 
 			int k = cv::waitKey();
@@ -521,11 +515,12 @@ bool GetCoinClassifyErrors(cv::Mat &img, vector<Coin> &coins, HistogramInfo &his
 				exiting = true;
 				break;
 			}
+			if (exiting) break;
 		}
 		
-		cv::imshow("coin", cv::Mat::zeros(img_YCrCb.size(), CV_8UC1));
-		if (histInfo.silver_hist.size().width && histInfo.silver_hist.size().height) cv::imshow("silver_hist", histInfo.silver_hist);
-		if (histInfo.gold_hist.size().width && histInfo.gold_hist.size().height) cv::imshow("gold_hist", histInfo.gold_hist);
+		cv::imshow("coin (left=silver, right=gold)", cv::Mat::zeros(img_YCrCb.size(), CV_8UC1));
+		//if (histInfo.silver_hist.size().width && histInfo.silver_hist.size().height) cv::imshow("silver_hist", histInfo.silver_hist);
+		//if (histInfo.gold_hist.size().width && histInfo.gold_hist.size().height) cv::imshow("gold_hist", histInfo.gold_hist);
 
 		// save hists to file and exit
 		histInfo.hist_storage.open("histograms.yml", cv::FileStorage::WRITE);
@@ -533,7 +528,7 @@ bool GetCoinClassifyErrors(cv::Mat &img, vector<Coin> &coins, HistogramInfo &his
 		histInfo.hist_storage << "gold" <<  histInfo.gold_hist;
 		histInfo.hist_storage.release();
 
-		cv::waitKey(); // wait so we can see hists
+		//cv::waitKey(); // wait so we can see hists
 
 		return !exiting; // skip everything else, in training mode all we do is train
 	}
@@ -729,7 +724,7 @@ bool FindFrameAndCoins(cv::Mat &image, cv::Mat &cameraMatrix, cv::Mat &distCoeff
 			cv::Point2f d = ellipses[i].center - ellipses[j].center;
 			float AR2 = ellipses[j].size.height / ellipses[j].size.width;
 			float a = ellipses[i].angle - ellipses[j].angle; a += (a > 180) ? -360 : (a < -180) ? 360 : 0;
-			if ((d.x*d.x + d.y*d.y) < 64.f && AR2 > AR*0.6f && AR2 < AR*1.5f && (!check_angle || abs(a) < 15.f))
+			if ((d.x*d.x + d.y*d.y) < 64.f && AR2 > AR*0.8f && AR2 < AR*1.2f && (!check_angle || abs(a) < 15.f))
 			{
 				// two concentric ellipses found
 				float rw = ellipses[j].size.width / ellipses[i].size.width;
@@ -743,12 +738,12 @@ bool FindFrameAndCoins(cv::Mat &image, cv::Mat &cameraMatrix, cv::Mat &distCoeff
 					outer_frame_ellipses.push_back(ellipses[i]);// inner circle. Should we save both???
 				}
 
-				if (avg_r > 2.5f && avg_r < 3.5f) // if ~3x as big then could be the stationary marker
+				if (avg_r > 2.6f && avg_r < 3.4f) // if ~3x as big then could be the stationary marker
 				{
 					possible_stationary_markers.push_back(ellipses[i]);
 				}
 
-				if (avg_r > 1.7f && avg_r < 2.3f) // if it is twice as big then this is probably the centre marker
+				if (avg_r > 1.8f && avg_r < 2.2f) // if it is twice as big then this is probably the centre marker
 				{
 					//cv::ellipse(img_ellipses, ellipses[i], cv::Scalar(255,0,0), 5);
 					//cv::ellipse(img_ellipses, ellipses[j], cv::Scalar(255,0,0), 5);
@@ -804,14 +799,24 @@ bool FindFrameAndCoins(cv::Mat &image, cv::Mat &cameraMatrix, cv::Mat &distCoeff
 			
 			if (bounds.contains(outer_frame_ellipses[l].center)) {
 				
-				cv::Vec3b col = image.at<cv::Vec3b>(outer_frame_ellipses[l].center); // TODO: should prob avg multiple pixels...
+				cv::Rect frame_marker_bound = outer_frame_ellipses[l].boundingRect();
+				cv::RotatedRect frame_marker_mask_ellipse = outer_frame_ellipses[l];
+				frame_marker_mask_ellipse.center -= cv::Point2f(frame_marker_bound.tl());
+				cv::Mat frame_marker_img = image(frame_marker_bound);
+				cv::Mat mask = cv::Mat::zeros(frame_marker_img.size(), CV_8UC1);
+				cv::ellipse(mask, frame_marker_mask_ellipse, cv::Scalar(255), -1);
+
+				cv::Scalar mean, stddev;
+				cv::meanStdDev(frame_marker_img, mean, stddev, mask);
+
+				double stddev_mean = (stddev.val[0] + stddev.val[1] + stddev.val[2]) * 0.333333;
+				if (stddev_mean > 30.) continue;
 				
-				// TODO: more thorough colour checking???
-				if (col[2] > col[0] && col[2] > col[1]) { // red
+				if (mean.val[2] > mean.val[0] && mean.val[2] > mean.val[1]) { // red
 					frame_points[1] = outer_frame_ellipses[l].center; p1 = true;
-				} else if (col[1] > col[0] && col[1] > col[2]) { // green
+				} else if (mean.val[1] > mean.val[0] && mean.val[1] > mean.val[2]) { // green
 					frame_points[2] = outer_frame_ellipses[l].center; p2 = true;
-				} else if (col[0] > col[1] && col[0] > col[2]) { // blue
+				} else if (mean.val[0] > mean.val[1] && mean.val[0] > mean.val[2]) { // blue
 					frame_points[3] = outer_frame_ellipses[l].center; p3 = true;
 				}
 			}
